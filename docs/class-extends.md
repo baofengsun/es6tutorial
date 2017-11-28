@@ -92,6 +92,23 @@ cp instanceof Point // true
 
 上面代码中，实例对象`cp`同时是`ColorPoint`和`Point`两个类的实例，这与 ES5 的行为完全一致。
 
+最后，父类的静态方法，也会被子类继承。
+
+```javascript
+class A {
+  static hello() {
+    console.log('hello world');
+  }
+}
+
+class B extends A {
+}
+
+B.hello()  // hello world
+```
+
+上面代码中，`hello()`是`A`类的静态方法，`B`继承`A`，也继承了`A`的静态方法。
+
 ## Object.getPrototypeOf()
 
 `Object.getPrototypeOf`方法可以用来从子类上获取父类。
@@ -214,7 +231,7 @@ let b = new B();
 
 上面代码中，属性`x`是定义在`A.prototype`上面的，所以`super.x`可以取到它的值。
 
-ES6 规定，通过`super`调用父类的方法时，`super`会绑定子类的`this`。
+ES6 规定，通过`super`调用父类的方法时，方法内部的`this`指向子类。
 
 ```javascript
 class A {
@@ -240,9 +257,9 @@ let b = new B();
 b.m() // 2
 ```
 
-上面代码中，`super.print()`虽然调用的是`A.prototype.print()`，但是`A.prototype.print()`会绑定子类`B`的`this`，导致输出的是`2`，而不是`1`。也就是说，实际上执行的是`super.print.call(this)`。
+上面代码中，`super.print()`虽然调用的是`A.prototype.print()`，但是`A.prototype.print()`内部的`this`指向子类`B`，导致输出的是`2`，而不是`1`。也就是说，实际上执行的是`super.print.call(this)`。
 
-由于绑定子类的`this`，所以如果通过`super`对某个属性赋值，这时`super`就是`this`，赋值的属性会变成子类实例的属性。
+由于`this`指向子类，所以如果通过`super`对某个属性赋值，这时`super`就是`this`，赋值的属性会变成子类实例的属性。
 
 ```javascript
 class A {
@@ -325,7 +342,7 @@ class B extends A {
 let b = new B();
 ```
 
-上面代码中，`super.valueOf()`表明`super`是一个对象，因此就不会报错。同时，由于`super`绑定`B`的`this`，所以`super.valueOf()`返回的是一个`B`的实例。
+上面代码中，`super.valueOf()`表明`super`是一个对象，因此就不会报错。同时，由于`super`使得`this`指向`B`，所以`super.valueOf()`返回的是一个`B`的实例。
 
 最后，由于对象总是继承其他对象的，所以可以在任意一个对象中，使用`super`关键字。
 
@@ -399,7 +416,7 @@ Object.setPrototypeOf(B, A);
 B.__proto__ = A;
 ```
 
-这两条继承链，可以这样理解：作为一个对象，子类（`B`）的原型（`__proto__`属性）是父类（`A`）；作为一个构造函数，子类（`B`）的原型（`prototype`属性）是父类的实例。
+这两条继承链，可以这样理解：作为一个对象，子类（`B`）的原型（`__proto__`属性）是父类（`A`）；作为一个构造函数，子类（`B`）的原型对象（`prototype`属性）是父类的原型对象（`prototype`属性）的实例。
 
 ```javascript
 Object.create(A.prototype);
@@ -442,7 +459,7 @@ A.__proto__ === Function.prototype // true
 A.prototype.__proto__ === Object.prototype // true
 ```
 
-这种情况下，A作为一个基类（即不存在任何继承），就是一个普通函数，所以直接继承`Function.prototype`。但是，`A`调用后返回一个空对象（即`Object`实例），所以`A.prototype.__proto__`指向构造函数（`Object`）的`prototype`属性。
+这种情况下，`A`作为一个基类（即不存在任何继承），就是一个普通函数，所以直接继承`Function.prototype`。但是，`A`调用后返回一个空对象（即`Object`实例），所以`A.prototype.__proto__`指向构造函数（`Object`）的`prototype`属性。
 
 第三种特殊情况，子类继承`null`。
 
@@ -454,7 +471,7 @@ A.__proto__ === Function.prototype // true
 A.prototype.__proto__ === undefined // true
 ```
 
-这种情况与第二种情况非常像。`A`也是一个普通函数，所以直接继承`Function.prototype`。但是，A调用后返回的对象不继承任何方法，所以它的`__proto__`指向`Function.prototype`，即实质上执行了下面的代码。
+这种情况与第二种情况非常像。`A`也是一个普通函数，所以直接继承`Function.prototype`。但是，`A`调用后返回的对象不继承任何方法，所以它的`__proto__`指向`Function.prototype`，即实质上执行了下面的代码。
 
 ```javascript
 class C extends null {
@@ -519,7 +536,7 @@ MyArray.prototype = Object.create(Array.prototype, {
 });
 ```
 
-上面代码定义了一个继承Array的`MyArray`类。但是，这个类的行为与`Array`完全不一致。
+上面代码定义了一个继承 Array 的`MyArray`类。但是，这个类的行为与`Array`完全不一致。
 
 ```javascript
 var colors = new MyArray();
@@ -592,16 +609,18 @@ x.history // [[]]
 
 x.commit();
 x.history // [[], [1, 2]]
+
 x.push(3);
 x // [1, 2, 3]
+x.history // [[], [1, 2]]
 
 x.revert();
 x // [1, 2]
 ```
 
-上面代码中，`VersionedArray`结构会通过`commit`方法，将自己的当前状态存入`history`属性，然后通过`revert`方法，可以撤销当前版本，回到上一个版本。除此之外，`VersionedArray`依然是一个数组，所有原生的数组方法都可以在它上面调用。
+上面代码中，`VersionedArray`会通过`commit`方法，将自己的当前状态生成一个版本快照，存入`history`属性。`revert`方法用来将数组重置为最新一次保存的版本。除此之外，`VersionedArray`依然是一个普通数组，所有原生的数组方法都可以在它上面调用。
 
-下面是一个自定义`Error`子类的例子。
+下面是一个自定义`Error`子类的例子，可以用来定制报错时的行为。
 
 ```javascript
 class ExtendableError extends Error {
@@ -638,22 +657,36 @@ class NewObj extends Object{
   }
 }
 var o = new NewObj({attr: true});
-console.log(o.attr === true);  // false
+o.attr === true  // false
 ```
 
-上面代码中，`NewObj`继承了`Object`，但是无法通过`super`方法向父类`Object`传参。这是因为ES6改变了`Object`构造函数的行为，一旦发现`Object`方法不是通过`new Object()`这种形式调用，ES6 规定`Object`构造函数会忽略参数。
+上面代码中，`NewObj`继承了`Object`，但是无法通过`super`方法向父类`Object`传参。这是因为 ES6 改变了`Object`构造函数的行为，一旦发现`Object`方法不是通过`new Object()`这种形式调用，ES6 规定`Object`构造函数会忽略参数。
 
 ## Mixin 模式的实现
 
-Mixin 模式指的是，将多个类的接口“混入”（mix in）另一个类。它在 ES6 的实现如下。
+Mixin 指的是多个对象合成一个新的对象，新对象具有各个组成成员的接口。它的最简单实现如下。
+
+```javascript
+const a = {
+  a: 'a'
+};
+const b = {
+  b: 'b'
+};
+const c = {...a, ...b}; // {a: 'a', b: 'b'}
+```
+
+上面代码中，`c`对象是`a`对象和`b`对象的合成，具有两者的接口。
+
+下面是一个更完备的实现，将多个类的接口“混入”（mix in）另一个类。
 
 ```javascript
 function mix(...mixins) {
   class Mix {}
 
   for (let mixin of mixins) {
-    copyProperties(Mix, mixin);
-    copyProperties(Mix.prototype, mixin.prototype);
+    copyProperties(Mix, mixin); // 拷贝实例属性
+    copyProperties(Mix.prototype, mixin.prototype); // 拷贝原型属性
   }
 
   return Mix;
@@ -679,4 +712,3 @@ class DistributedEdit extends mix(Loggable, Serializable) {
   // ...
 }
 ```
-
